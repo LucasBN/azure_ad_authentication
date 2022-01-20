@@ -11,7 +11,7 @@ class AzureAdAuthenticationPlugin : FlutterPlugin, ActivityAware {
 
     private var TAG = "AzureAdAuthenticationPlugin"
     private var msalCallHandler: MsalHandlerImpl? = null
-    private var msal:Msal? = null;
+    private var msal:Msal? = null
 
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -24,7 +24,7 @@ class AzureAdAuthenticationPlugin : FlutterPlugin, ActivityAware {
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         if (msalCallHandler == null) {
-            Log.wtf(TAG, "Already detached from the engine.");
+            Log.wtf(TAG, "Already detached from the engine.")
             return;
         }
 
@@ -46,7 +46,7 @@ class AzureAdAuthenticationPlugin : FlutterPlugin, ActivityAware {
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
-        onDetachedFromActivity();
+        onDetachedFromActivity()
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
