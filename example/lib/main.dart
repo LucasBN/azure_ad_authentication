@@ -74,7 +74,7 @@ class _MyAppState extends State<MyApp> {
   Future<AzureAdAuthentication> intPca() async {
     return await AzureAdAuthentication.createPublicClientApplication(
         config: MsalConfig(
-          'b0024ae1-263c-406a-8bc6-34aecf73a907',
+          clientId: 'b0024ae1-263c-406a-8bc6-34aecf73a907',
           redirectUri: _getRedirectUri(),
           accountMode: AccountMode.SINGLE,
           authorizationUserAgent: AuthorizedUserAgent.DEFAULT,
