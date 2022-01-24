@@ -206,6 +206,21 @@ class MsalConfig {
     this.http = const MsalHttpConfig(),
   });
 
+  factory MsalConfig.copy(MsalConfig config) => MsalConfig(
+    clientId: config.clientId,
+    redirectUri: config.redirectUri,
+    authorities: config.authorities,
+    environment: config.environment,
+    accountMode: config.accountMode,
+    sharedDeviceModeSupported: config.sharedDeviceModeSupported,
+    brokerRedirectUriRegistered: config.brokerRedirectUriRegistered,
+    authorizationUserAgent: config.authorizationUserAgent,
+    http: config.http,
+    logging: config.logging,
+    multipleCloudsSupported: config.multipleCloudsSupported,
+  );
+
+
   final String clientId;
   final String redirectUri;
   final AccountMode accountMode;
