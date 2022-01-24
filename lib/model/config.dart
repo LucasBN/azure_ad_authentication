@@ -192,23 +192,22 @@ class ErrorLevel {
 
 
 class MsalConfig {
-  MsalConfig(
-    this.clientId, {
-      this.redirectUri,
-      this.authorities = const [_defaultAuthorities],
-      this.environment = 'Production',
-      this.accountMode = AccountMode.SINGLE,
-      this.sharedDeviceModeSupported = false,
-      this.brokerRedirectUriRegistered = false,
-      this.multipleCloudsSupported = false,
-      this.authorizationUserAgent = AuthorizedUserAgent.DEFAULT,
-      this.logging = const MsalLoggingConfig(),
-      this.http = const MsalHttpConfig(),
-    }
-  );
+  MsalConfig({
+    required this.clientId,
+    required this.redirectUri,
+    this.authorities = const [_defaultAuthorities],
+    this.environment = 'Production',
+    this.accountMode = AccountMode.SINGLE,
+    this.sharedDeviceModeSupported = false,
+    this.brokerRedirectUriRegistered = false,
+    this.multipleCloudsSupported = false,
+    this.authorizationUserAgent = AuthorizedUserAgent.DEFAULT,
+    this.logging = const MsalLoggingConfig(),
+    this.http = const MsalHttpConfig(),
+  });
 
   final String clientId;
-  final String? redirectUri;
+  final String redirectUri;
   final AccountMode accountMode;
   final List<MsalAuthority> authorities;
   final bool multipleCloudsSupported;
