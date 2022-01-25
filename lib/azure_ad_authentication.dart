@@ -35,12 +35,15 @@ class AzureAdAuthentication {
 
   /// Acquire a token interactively for the given [scopes]
   /// return [UserAdModel] contains user information but token and expiration date
-  Future<UserAdModel?> acquireToken({required List<String> scopes}) async {
+  Future<UserAdModel?> acquireToken({
+    required List<String> scopes,
+    bool fetchUserModel = false,
+  }) async {
     var res = <String, dynamic>{'scopes': scopes};
     try {
       final result = await _channel.invokeMapMethod<String, dynamic>('acquireToken', res);
       UserAdModel userAdModel = UserAdModel.fromJson(result!);
-      return await _getUserModel(userAdModel);
+      return fetchUserModel ? await _getUserModel(userAdModel) : userAdModel;
     } on PlatformException catch (e) {
       throw _convertException(e);
     }
@@ -62,8 +65,10 @@ class AzureAdAuthentication {
 
   /// Acquire a token silently, with no user interaction, for the given [scopes]
   /// return [UserAdModel] contains user information but token and expiration date
-  Future<UserAdModel?> acquireTokenSilent(
-      {required List<String> scopes}) async {
+  Future<UserAdModel?> acquireTokenSilent({
+    required List<String> scopes,
+    bool fetchUserModel = false,
+  }) async {
     var res = <String, dynamic>{'scopes': scopes};
     try {
       if (Platform.isAndroid) {
@@ -72,7 +77,7 @@ class AzureAdAuthentication {
       final result =
           await _channel.invokeMapMethod<String, dynamic>('acquireTokenSilent', res);
       UserAdModel userAdModel = UserAdModel.fromJson(result!);
-      return await _getUserModel(userAdModel);
+      return fetchUserModel ? await _getUserModel(userAdModel) : userAdModel;
     } on PlatformException catch (e) {
       throw _convertException(e);
     }
