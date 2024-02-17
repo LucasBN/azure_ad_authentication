@@ -1,16 +1,22 @@
 package com.fsconceicao.azure_ad_authentication
 
+import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.microsoft.identity.client.*
 import com.microsoft.identity.client.exception.MsalException
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.jetbrains.annotations.Nullable
+import java.io.File
+import java.io.FileWriter
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 import java.util.*
-
 
 class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler {
     private val TAG = "MsalHandlerImpl"
@@ -30,26 +36,29 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
 
     fun stopListening() {
         if (channel == null) {
-            Log.d(TAG, "Tried to stop listening when no MethodChannel had been initialized.")
-            return
+            Log.d(TAG, "Tried to stop listening when no MethodChannel had been initialized.");
+            return;
         }
 
-        channel!!.setMethodCallHandler(null)
-        channel = null
+        channel!!.setMethodCallHandler(null);
+        channel = null;
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         Log.d("DART/NATIVE", "onMethodCall ${call.method}")
         val scopesArg: ArrayList<String>? = call.argument("scopes")
         val scopes: Array<String>? = scopesArg?.toTypedArray()
-        val clientId: String? = call.argument("clientId")
+        //val clientId: String? = call.argument("clientId")
+
+        val config: Map<String, Any?>? = call.argument("config")
+
         //our code
         when (call.method) {
             "initialize" -> {
-                initialize(clientId, result)
+                initialize(config, result)
             }
             "loadAccounts" -> Thread(Runnable { msal.loadAccounts(result) }).start()
-            "acquireToken" -> Thread(Runnable { acquireToken(scopes, result) }).start()
+            "acquireToken" -> Thread(Runnable { acquireToken(scopes, result)}).start()
             "acquireTokenSilent" -> Thread(Runnable { acquireTokenSilent(scopes, result) }).start()
             "logout" -> Thread(Runnable { logout(result) }).start()
             else -> result.notImplemented()
@@ -80,23 +89,24 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
             return
         }
 
-        msal.adAuthentication.removeAccount(
-            msal.accountList.first(),
-            object : IMultipleAccountPublicClientApplication.RemoveAccountCallback {
-                override fun onRemoved() {
-                    Thread(Runnable { msal.loadAccounts(result) }).start()
-                }
 
-                override fun onError(exception: MsalException) {
-                    result.error(
-                        "NO_ACCOUNT",
-                        "No account is available to acquire token silently for",
-                        exception
-                    )
-                }
-            })
+        (msal.adAuthentication as? IMultipleAccountPublicClientApplication)?.let {
+            it.removeAccount(
+                msal.accountList.first(),
+                object : IMultipleAccountPublicClientApplication.RemoveAccountCallback {
+                    override fun onRemoved() {
+                        Thread(Runnable { msal.loadAccounts(result) }).start()
+                    }
 
-
+                    override fun onError(exception: MsalException) {
+                        result.error(
+                            "NO_ACCOUNT",
+                            "No account is available to acquire token silently for",
+                            exception
+                        )
+                    }
+                })
+        }
     }
 
     private fun acquireTokenSilent(scopes: Array<String>?, result: MethodChannel.Result) {
@@ -131,61 +141,131 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
             }
             return
         }
-        val selectedAccount: IAccount = msal.accountList.first()
-        //acquire the token and return the result
-        val sc = scopes.map { s -> s.lowercase(Locale.ROOT) }.toTypedArray()
+        val selectedAccount: IAccount = msal.accountList.first();
 
-        val builder = AcquireTokenSilentParameters.Builder()
-        builder.withScopes(scopes.toList())
+        //acquire the token and return the result
+        val sc = scopes.map { s -> s.toLowerCase(Locale.ROOT) }
+
+        val aquireTokenParameters = AcquireTokenSilentParameters
+            .Builder()
             .forAccount(selectedAccount)
+            .withScopes(sc)
             .fromAuthority(selectedAccount.authority)
-            .withCallback(msal.getAuthCallback(result))
-        val acquireTokenParameters = builder.build()
-        msal.adAuthentication.acquireTokenSilentAsync(acquireTokenParameters)
+            .withCallback(msal.getAuthSilentCallback(result))
+            .build()
+
+        msal.adAuthentication.acquireTokenSilentAsync(aquireTokenParameters)
+    }
+
+
+    private fun getPersistedCurrentAccount(): IAccount? {
+        var account: IAccount? = null
+        val c: Class<*> = SingleAccountPublicClientApplication::class.java
+        var method: Method? = null
+        try {
+            method = c.getDeclaredMethod("getPersistedCurrentAccount")
+            method.isAccessible = true
+            account = method.invoke(msal.adAuthentication) as IAccount?
+        } catch (e: NoSuchMethodException) {
+            e.printStackTrace()
+        } catch (e: IllegalAccessException) {
+            return null
+        } catch (e: InvocationTargetException) {
+            return null
+        } catch (e: Exception) {
+            return null
+        }
+        return account
     }
 
     private fun acquireToken(scopes: Array<String>?, result: MethodChannel.Result) {
+        println("Acquire token begin")
         if (!msal.isClientInitialized()) {
-            Handler(Looper.getMainLooper()).post {
+            println("No client")
+
+           // Handler(Looper.getMainLooper()).post {
                 result.error(
                     "NO_CLIENT",
                     "Client must be initialized before attempting to acquire a token.",
                     null
                 )
-            }
+           // }
         }
 
         if (scopes == null) {
+            println("No scopes")
+
             result.error("NO_SCOPE", "Call must include a scope", null)
             return
         }
 
-        //remove old accounts
-        while (msal.adAuthentication.accounts.any())
-            msal.adAuthentication.removeAccount(msal.adAuthentication.accounts.first())
+        //remove old accounts (is this needed for multi account?)
+        (msal.adAuthentication as? IMultipleAccountPublicClientApplication)?.let {
+            while(it.accounts.any())
+                it.removeAccount(it.accounts.first())
 
+        }
+
+        println("Acquire token begin 2")
+        println(msal.activity)
 
         //acquire the token
+        msal.activity?.let {
 
-        msal.activity.let {
-            val builder = AcquireTokenParameters.Builder()
-            builder.startAuthorizationFromActivity(it?.activity)
-                .withScopes(scopes.toList())
-                .withPrompt(Prompt.LOGIN)
-                .withCallback(msal.getAuthCallback(result))
-            val acquireTokenParameters = builder.build()
+            println("getting persisted account")
+            val persistedAccount = if (msal.adAuthentication is SingleAccountPublicClientApplication) {
+                getPersistedCurrentAccount()
+            } else null
+
+            println("Getting parameters")
+            val acquireTokenParameters: AcquireTokenParameters = buildAcquireTokenParameters(
+                it,
+                scopes,
+                //authority,
+                persistedAccount,
+                msal.getAuthCallback(result)
+            )
+
+            println("Acquire token begin 3")
+            
+
             msal.adAuthentication.acquireToken(acquireTokenParameters)
         }
     }
 
-    private fun initialize(clientId: String?, result: MethodChannel.Result) {
-        //ensure clientid provided
-        if (clientId == null) {
-            result.error("NO_CLIENTID", "Call must include a clientId", null)
+    private fun buildAcquireTokenParameters(
+        activity: Activity,
+        scopes: Array<String>,
+        account: IAccount?,
+        callback: AuthenticationCallback
+    ): AcquireTokenParameters {
+        val builder = AcquireTokenParameters.Builder()
+                builder.startAuthorizationFromActivity(activity)
+            .withScopes(scopes.asList())
+            .withCallback(callback)
+        if (account != null) {
+            builder.forAccount(account)
+        }
+        return builder.build()
+    }
+
+    private fun initialize(config: Map<String, Any?>?, result: MethodChannel.Result) {
+        if (config == null) {
+            result.error("NO_CONFIG", "Call must include a config", null)
             return
         }
 
-        //if already initialized, ensure clientid hasn't changed
+        val gson = Gson()
+        val jsonConfigString = gson.toJson(config);
+        var jsonConfig = gson.fromJson(jsonConfigString, JsonObject::class.java)
+
+        val accountMode = jsonConfig.get("account_mode").asString
+        val clientId = jsonConfig.get("client_id").asString
+
+        if (clientId == null) {
+            result.error("NO_CLIENTID", "Call must include config with a clientId", null)
+            return
+        }
 
         if (msal.isClientInitialized()) {
             Log.d("initialize = TRUE", "${msal.isClientInitialized()}")
@@ -198,13 +278,37 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
                     null
                 )
             }
+            return;
         }
-        if (!msal.isClientInitialized()) {
-            // if authority is set, create client using it, otherwise use default
-            PublicClientApplication.createMultipleAccountPublicClientApplication(
-                msal.applicationContext,
-                R.raw.msal_default_config, msal.getApplicationCreatedListener(result)
-            )
+
+        val configFile = File.createTempFile("configFile", "json")
+        var configFileWriter: FileWriter? = null
+        try {
+            configFileWriter = FileWriter(configFile, true)
+            configFileWriter.write(jsonConfig.toString())
+
+
+            if (!msal.isClientInitialized()) {
+                if (accountMode == "MULTIPLE") {
+                    PublicClientApplication.createMultipleAccountPublicClientApplication(
+                        msal.applicationContext,
+                        configFile,
+                        msal.getMultipleApplicationCreatedListener(result)
+                    )
+                } else {
+                    PublicClientApplication.createSingleAccountPublicClientApplication(
+                        msal.applicationContext,
+                        configFile,
+                        msal.getSingleApplicationCreatedListener(result)
+                    )
+                }
+
+            }
+        } finally {
+            if (configFileWriter != null) {
+                configFileWriter.flush()
+                configFileWriter.close()
+            }
         }
     }
 

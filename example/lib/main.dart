@@ -1,10 +1,11 @@
+import 'dart:io';
 
 import 'package:azure_ad_authentication/azure_ad_authentication.dart';
 import 'package:azure_ad_authentication/exeption.dart';
+import 'package:azure_ad_authentication/model/config.dart';
 import 'package:azure_ad_authentication/model/user_ad.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/services.dart';
 
 void main() => runApp(const MyApp());
@@ -17,17 +18,11 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  static const String _authority =
-      "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize";
-  static const String _redirectUriMacos = "msauth.msal2794d211-4e3f-4010-9f37-250f928d19c5://auth";
-  //static const String _redirectUriIos = "msal2794d211-4e3f-4010-9f37-250f928d19c5";
-
-  static const String _clientId = "2794d211-4e3f-4010-9f37-250f928d19c5";
+  static const String _clientId = "24f6b811-7372-4560-851f-e13a0e2e9a10";
 
   String _output = 'NONE';
   static const List<String> kScopes = [
-    "https://graph.microsoft.com/user.read",
-    "https://graph.microsoft.com/Calendars.ReadWrite",
+    "https://graph.microsoft.com/User.ReadBasic.All",
   ];
 
   Future<void> _acquireToken() async {
@@ -38,19 +33,14 @@ class _MyAppState extends State<MyApp> {
     await getResult(isAcquireToken: false);
   }
 
-  /// example return "{accessToken": xxx,"expiresOn" : xxx}"
-  Future<String> tokenString() async {
-    AzureAdAuthentication pca = await intPca();
-    return await pca.acquireTokenString(scopes: kScopes);
-  }
-
   Future<String> getResult({bool isAcquireToken = true}) async {
     AzureAdAuthentication pca = await intPca();
     String? res;
     UserAdModel? userAdModel;
     try {
       if (isAcquireToken) {
-        userAdModel = await pca.acquireToken(scopes: kScopes);
+        userAdModel =
+            await pca.acquireToken(scopes: kScopes, fetchUserModel: true);
       } else {
         userAdModel = await pca.acquireTokenSilent(scopes: kScopes);
       }
@@ -69,13 +59,60 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _output = (userAdModel?.toJson().toString() ?? res)!;
     });
+
+    print("Here");
+
     return (userAdModel?.toJson().toString() ?? res)!;
   }
 
+  String _getRedirectUri() {
+    switch (Platform.operatingSystem) {
+      case "android":
+        return "msauth://com.fsconceicao.azure_ad_authentication_example/U5rbvBLdFUbEazWhQfDgt6oRa24%3D";
+      case "ios":
+        return "msauth.com.fsconceicao.azureAdAuthenticationExample://auth";
+    }
+    throw UnimplementedError();
+  }
+
+  String? _getTenantId() {
+    switch (Platform.operatingSystem) {
+      case "android":
+        return "e0e89c40-ac3f-4817-8d6d-05714d65705c";
+      case "ios":
+        return null;
+    }
+    throw UnimplementedError();
+  }
+
+  String? _getAuthorityUrl() {
+    switch (Platform.operatingSystem) {
+      case "android":
+        return null;
+      case "ios":
+        return "https://login.microsoftonline.com/e0e89c40-ac3f-4817-8d6d-05714d65705c/saml2";
+    }
+    throw UnimplementedError();
+  }
+
   Future<AzureAdAuthentication> intPca() async {
-    var _redirectUri = Platform.isIOS ? null : _redirectUriMacos;
     return await AzureAdAuthentication.createPublicClientApplication(
-        clientId: _clientId, authority: _authority, redirectUri: _redirectUri,);
+      config: MsalConfig(
+        clientId: _clientId,
+        redirectUri: _getRedirectUri(),
+        brokerRedirectUriRegistered: true,
+        authorities: [
+          MsalAuthority(
+            AuthorityType.AAD,
+            MsalAudience(
+              AudienceType.AzureADMyOrg,
+              tenantId: _getTenantId(),
+            ),
+            authorityUrl: _getAuthorityUrl(),
+          ),
+        ],
+      ),
+    );
   }
 
   Future _logout() async {
@@ -100,7 +137,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text("Plugin example app"),
         ),
         body: SingleChildScrollView(
           child: Center(
@@ -110,16 +147,16 @@ class _MyAppState extends State<MyApp> {
                   padding: const EdgeInsets.all(8.0),
                   child: ElevatedButton(
                     onPressed: _acquireToken,
-                    child: const Text('AcquireToken()'),
+                    child: const Text("AcquireToken()"),
                   ),
                 ),
                 ElevatedButton(
                     onPressed: _acquireTokenSilently,
-                    child: const Text('AcquireTokenSilently()')),
+                    child: const Text("AcquireTokenSilently()")),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: ElevatedButton(
-                      onPressed: _logout, child: const Text('Logout')),
+                      onPressed: _logout, child: const Text("Logout")),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
