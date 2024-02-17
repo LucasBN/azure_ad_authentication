@@ -179,10 +179,7 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
     }
 
     private fun acquireToken(scopes: Array<String>?, result: MethodChannel.Result) {
-        println("Acquire token begin")
         if (!msal.isClientInitialized()) {
-            println("No client")
-
            // Handler(Looper.getMainLooper()).post {
                 result.error(
                     "NO_CLIENT",
@@ -193,8 +190,6 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
         }
 
         if (scopes == null) {
-            println("No scopes")
-
             result.error("NO_SCOPE", "Call must include a scope", null)
             return
         }
@@ -206,18 +201,14 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
 
         }
 
-        println("Acquire token begin 2")
-        println(msal.activity)
 
         //acquire the token
         msal.activity?.let {
 
-            println("getting persisted account")
             val persistedAccount = if (msal.adAuthentication is SingleAccountPublicClientApplication) {
                 getPersistedCurrentAccount()
             } else null
 
-            println("Getting parameters")
             val acquireTokenParameters: AcquireTokenParameters = buildAcquireTokenParameters(
                 it,
                 scopes,
@@ -225,10 +216,6 @@ class MsalHandlerImpl(private val msal: Msal) : MethodChannel.MethodCallHandler 
                 persistedAccount,
                 msal.getAuthCallback(result)
             )
-
-            println("Acquire token begin 3")
-            
-
             msal.adAuthentication.acquireToken(acquireTokenParameters)
         }
     }
